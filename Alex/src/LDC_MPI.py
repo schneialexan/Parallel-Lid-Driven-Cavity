@@ -8,6 +8,7 @@ import sys
 from mpi4py import MPI
 from LDC_program_options import LDCprogram_options
 from MPI_Manager import validate, split_grid
+from solver import Alex_Louis_Solver
 
 def main():
     ##########################
@@ -29,6 +30,7 @@ def main():
     partitionSize = (Px, Py)
     dx = 1.0 / (Nx - 1)
     dy = 1.0 / (Ny - 1)
+
     
     ##########################
     # Validate Inputs
@@ -41,18 +43,43 @@ def main():
     tStart = MPI.Wtime()
     
     cartGrid =  comm.Create_cart(dims=partitionSize, periods=[False, False])
+    
+    rankShift = cartGrid.Shift(0, 1)
+    rankShift += cartGrid.Shift(1, 1)
     subgrid_size, subgrid_pos = split_grid((Nx, Ny), partitionSize, cartGrid.Get_coords(rank), dx, dy)
     
+    print(f'Rank {rank}\t | Subgrid Size: {subgrid_size}\t | Subgrid Position: ({subgrid_pos[0]:.4f},{subgrid_pos[1]:.4f})')
+    solver = Alex_Louis_Solver(comm, 
+                               rank, 
+                               rankShift,
+                               cartGrid.Get_coords(rank), 
+                               subgrid_size, 
+                               dt, 
+                               t_end, 
+                               tau, 
+                               eps, 
+                               omg, 
+                               itermax, 
+                               alpha,
+                               dx, 
+                               dy, 
+                               subgrid_pos, 
+                               Re)
+
+    solver.initialize()
+    solver.solve()
     
     tElapsed = MPI.Wtime() - tStart
-    print(f'Rank {rank}\tSubgrid Size: {subgrid_size}\tSubgrid Position: ({subgrid_pos[0]:.4f},{subgrid_pos[1]:.4f})\tWall Time: {tElapsed:.6f} seconds')
     ##########################
     # End Simulation
     ##########################
     
     tElapsed_global = comm.reduce(tElapsed, op=MPI.MAX, root=0)
+    u_global = comm.gather(solver.u, root=0)
+    v_global = comm.gather(solver.v, root=0)
     if rank == 0:
         print(f"Total Wall Time: {tElapsed_global:.5f} seconds")
+        
     
 
 if __name__ == '__main__':
