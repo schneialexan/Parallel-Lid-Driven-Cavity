@@ -26,7 +26,6 @@ def split_grid(grid_size: Tuple[int, int], partition_size: Tuple[int, int], coor
 
     return (sub_grid_size_x, sub_grid_size_y), (sub_pos_x, sub_pos_y)
 
-
 # Example usage in a main program
 if __name__ == "__main__":
     # MPI Setup
@@ -47,6 +46,8 @@ if __name__ == "__main__":
     # Get Rank Shifts (for communication between neighboring processes)
     rankShift = cartGrid.Shift(0, 1)
     rankShift += cartGrid.Shift(1, 1)
+    rankShiftX = cartGrid.Shift(0, 1)
+    rankShiftY = cartGrid.Shift(1, 1)
     
     # Get Subgrid Size and Position (for each process)
     subgrid_size, subgrid_pos = split_grid((Nx, Ny), partitionSize, cartGrid.Get_coords(rank), dx, dy)
@@ -62,20 +63,14 @@ if __name__ == "__main__":
     v_local = np.zeros((subgrid_size[0], subgrid_size[1]))
     p_local = np.zeros((subgrid_size[0], subgrid_size[1]))
     
-    # Scatter Data
-    comm.Scatter(u, u_local, root=0)
-    comm.Scatter(v, v_local, root=0)
-    comm.Scatter(p, p_local, root=0)
+    # TODO: Scatter Data
     
     # change values of u_local, v_local, p_local to test communication
     u_local = np.ones((subgrid_size[0], subgrid_size[1])) * rank + 1
     v_local = np.ones((subgrid_size[0], subgrid_size[1])) * rank + 1
     p_local = np.ones((subgrid_size[0], subgrid_size[1])) * rank + 1
     
-    # Gather Data
-    comm.Gather(u_local, u, root=0)
-    comm.Gather(v_local, v, root=0)
-    comm.Gather(p_local, p, root=0)
+    # TODO: Gather Data
     
     if rank == 0:
         # print the unique values in u, v, p, which now shouldn't be all zeros
