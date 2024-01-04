@@ -1,16 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-path = 'parallel_lid_driven/outputs/'
-#path += 'mpi/' 
-path += 'jit/'
+path = './'
 data_u = np.loadtxt(path+'u.dat')
 data_v = np.loadtxt(path+'v.dat')
 data_interpolated_u = np.zeros((data_u.shape[0], data_v.shape[1]))
 data_interpolated_v = np.zeros((data_u.shape[0], data_v.shape[1]))
-
-print(data_u.shape)
-print(data_v.shape)
 
 for i in range(data_interpolated_u.shape[0]-1):
     for j in range(data_interpolated_u.shape[1]-1):
@@ -38,4 +33,4 @@ plt.quiver(X[::st,::st] , Y[::st,::st], data_interpolated_u[::st,::st], data_int
 
 plt.gca().invert_yaxis()
 plt.show()
-#plt.savefig('plot_velocity.png')
+plt.savefig('plot_velocity.png')

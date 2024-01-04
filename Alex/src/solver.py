@@ -1,5 +1,7 @@
 import numpy as np
 from mpi4py import MPI
+import os
+from numba import jit
 
 class Alex_Louis_Solver:
     def __init__(self, MPIcomm, rank, rankShift, coords, gridSize, dt, t_end, tau, eps, omg, itermax, alpha, dx, dy, subPos, Re):
@@ -19,13 +21,6 @@ class Alex_Louis_Solver:
 
         self.coeff = np.zeros(3)        
         
-        self.p = np.zeros((self.Nx + 2, self.Ny + 2))
-        self.po = np.zeros((self.Nx + 2, self.Ny + 2))
-        self.RHS = np.zeros((self.Nx + 2, self.Ny + 2))
-        self.u = np.zeros((self.Nx + 2, self.Ny + 3))
-        self.F = np.zeros((self.Nx + 2, self.Ny + 3))
-        self.v = np.zeros((self.Nx + 3, self.Ny + 2))
-        self.G = np.zeros((self.Nx + 3, self.Ny + 2))
         self.tau = tau
         self.eps = eps
         self.omg = omg
@@ -42,13 +37,20 @@ class Alex_Louis_Solver:
         if self.rankShift[1] == -2:
             for i in range(1, self.Nx):
                 self.velU[i * self.Ny - 1] = self.U
+        
+        self.p = np.zeros((self.Nx + 2, self.Ny + 2))
+        self.po = np.zeros((self.Nx + 2, self.Ny + 2))
+        self.RHS = np.zeros((self.Nx + 2, self.Ny + 2))
+        self.u = np.zeros((self.Nx + 2, self.Ny + 3))
+        self.F = np.zeros((self.Nx + 2, self.Ny + 3))
+        self.v = np.zeros((self.Nx + 3, self.Ny + 2))
+        self.G = np.zeros((self.Nx + 3, self.Ny + 2))
 
     def solve(self):
         t = 0.0
         res = 9999
         while t < self.tEnd:
             n = 0
-            print(f"t: {t:.3f}")
             set_boundary_conditions(self.u, self.v, self.Ny, self.Nx)
             compute_f(self.Re, self.F, self.u, self.v, self.dx, self.dy, self.dt, self.Nx, self.Ny, self.alpha)
             compute_g(self.Re, self.G, self.u, self.v, self.dx, self.dy, self.dt, self.Nx, self.Ny, self.alpha)
@@ -63,6 +65,22 @@ class Alex_Louis_Solver:
             self.po = self.p
             t += self.dt
             #self.dt = select_dt_according_to_stability_condition(Re, dx, dy, tau, u, v, imax, jmax)
+    
+    def save_u_v(self, path="data/"):
+        def save_matrix(filename, matrix):
+            with open(filename, 'w') as file:
+                for i in range(matrix.shape[0]):
+                    for j in range(matrix.shape[1]):
+                        file.write(f"{matrix[i, j]:.5f} ")
+                    file.write("\n")
+            print(f"Matrix saved to {filename}")
+        
+        # check if path exists
+        if not os.path.exists(path):
+            os.makedirs(path)
+        
+        save_matrix(path + "u.dat", self.u)
+        save_matrix(path + "v.dat", self.v)
             
 
 def find_max_absolute_u(u, imax, jmax):
@@ -77,6 +95,7 @@ def select_dt_according_to_stability_condition(Re, dx, dy, tau, u, v, imax, jmax
     right = dy / find_max_absolute_v(v, imax, jmax)
     return tau * min(left, middle, right)
 
+@jit(fastmath=True, nopython=True)
 def set_boundary_conditions_u(u, jmax, imax):
     for j in range(jmax + 3):
         u[0, j] = 0.0
@@ -89,6 +108,7 @@ def set_boundary_conditions_u(u, jmax, imax):
     for i in range(jmax + 2):
         u[i, jmax + 1] = 2.0 - u[i, jmax]
 
+@jit(fastmath=True, nopython=True)
 def set_boundary_conditions_v(v, jmax, imax):
     for j in range(jmax + 2):
         v[0, j] = -v[1, j]
@@ -97,6 +117,7 @@ def set_boundary_conditions_v(v, jmax, imax):
     for i in range(imax + 3):
         v[i, 0] = 0.0
         v[i, jmax] = 0.0
+@jit(fastmath=True, nopython=True)
 def set_boundary_conditions(u, v, jmax, imax):
     # Set boundary conditions for u
     for j in range(jmax + 3):
@@ -120,6 +141,7 @@ def set_boundary_conditions(u, v, jmax, imax):
         v[i, jmax] = 0.0
 
 
+@jit(fastmath=True, nopython=True)
 def set_boundary_conditions_p(p, jmax, imax):
     for i in range(imax + 2):
         p[i, 0] = p[i, 1]
@@ -131,6 +153,7 @@ def set_boundary_conditions_p(p, jmax, imax):
 
 # ME_X namespace
 # Folien 5, Slide 15
+@jit(fastmath=True, nopython=True)
 def uu_x(u, dx, i, j, alpha):
     return (
         (1 / dx) * ((0.5 * (u[i, j] + u[i + 1, j])) ** 2 - (0.5 * (u[i - 1, j] + u[i, j])) ** 2)
@@ -141,6 +164,7 @@ def uu_x(u, dx, i, j, alpha):
         )
     )
 
+@jit(fastmath=True, nopython=True)
 def uv_y(u, v, dy, i, j, alpha):
     return (
         (1 / dy) * (
@@ -154,18 +178,22 @@ def uv_y(u, v, dy, i, j, alpha):
         )
     )
 
+@jit(fastmath=True, nopython=True)
 # Folien 5, Slide 16
 def uu_xx(u, dx, i, j):
     return (u[i + 1, j] - 2 * u[i, j] + u[i - 1, j]) / dx ** 2
 
+@jit(fastmath=True, nopython=True)
 def uu_yy(u, dy, i, j):
     return (u[i, j + 1] - 2 * u[i, j] + u[i, j - 1]) / dy ** 2
 
+@jit(fastmath=True, nopython=True)
 def p_x(p, dx, i, j):
     return (p[i + 1, j] - p[i, j]) / dx
 
 # ME_Y namespace
 # Folien 5, Slide 17
+@jit(fastmath=True, nopython=True)
 def uv_x(u, v, dx, i, j, alpha):
     return (
         (1 / dx) * (
@@ -179,6 +207,7 @@ def uv_x(u, v, dx, i, j, alpha):
         )
     )
 
+@jit(fastmath=True, nopython=True)
 def vv_y(v, dy, i, j, alpha):
     return (
         (1 / dy) * ((0.5 * (v[i, j] + v[i, j + 1])) ** 2 - (0.5 * (v[i, j - 1] + v[i, j])) ** 2)
@@ -190,24 +219,30 @@ def vv_y(v, dy, i, j, alpha):
     )
 
 # Folien 5, Slide 18
+@jit(fastmath=True, nopython=True)
 def vv_xx(v, dx, i, j):
     return (v[i + 1, j] - 2 * v[i, j] + v[i - 1, j]) / dx ** 2
 
+@jit(fastmath=True, nopython=True)
 def vv_yy(v, dy, i, j):
     return (v[i, j + 1] - 2 * v[i, j] + v[i, j - 1]) / dy ** 2
 
+@jit(fastmath=True, nopython=True)
 def p_y(p, dy, i, j):
     return (p[i, j + 1] - p[i, j]) / dy
 
 # CE namespace
 # Folien 5, Slide 19
+@jit(fastmath=True, nopython=True)
 def u_x(u, dx, i, j):
     return (u[i, j] - u[i - 1, j]) / dx
 
+@jit(fastmath=True, nopython=True)
 def v_y(v, dy, i, j):
     return (v[i, j] - v[i, j - 1]) / dy
 
 
+@jit(fastmath=True, nopython=True)
 def compute_f(Re, F, u, v, dx, dy, dt, imax, jmax, alpha):
     for j in range(1, jmax + 2):
         for i in range(1, imax + 1):
@@ -217,6 +252,7 @@ def compute_f(Re, F, u, v, dx, dy, dt, imax, jmax, alpha):
                 - uv_y(u, v, dy, i, j, alpha)
             )
 
+@jit(fastmath=True, nopython=True)
 def compute_g(Re, G, u, v, dx, dy, dt, imax, jmax, alpha):
     for i in range(1, imax + 2):
         for j in range(1, jmax + 1):
@@ -226,6 +262,7 @@ def compute_g(Re, G, u, v, dx, dy, dt, imax, jmax, alpha):
                 - vv_y(v, dy, i, j, alpha)
             )
 
+@jit(fastmath=True, nopython=True)
 def compute_rhs(RHS, F, G, dx, dy, dt, imax, jmax):
     for i in range(1, imax + 1):
         for j in range(1, jmax + 1):
@@ -234,6 +271,7 @@ def compute_rhs(RHS, F, G, dx, dy, dt, imax, jmax):
                 (G[i, j] - G[i, j - 1]) / dy
             )
 
+@jit(fastmath=True, nopython=True)
 def update_step_lgls(RHS, p, dx, dy, imax, jmax):
     for i in range(1, imax + 1):
         for j in range(1, jmax + 1):
@@ -246,14 +284,17 @@ def update_step_lgls(RHS, p, dx, dy, imax, jmax):
                 )
             )
 
+@jit(fastmath=True, nopython=True)
 def compute_residual(p, po):
     return np.linalg.norm(p - po)
 
+@jit(fastmath=True, nopython=True)
 def compute_u(u, F, p, dx, dt, imax, jmax):
     for i in range(1, imax + 1):
         for j in range(1, jmax + 2):
             u[i, j] = F[i, j] - (dt / dx) * (p[i + 1, j] - p[i, j])
 
+@jit(fastmath=True, nopython=True)
 def compute_v(v, G, p, dy, dt, imax, jmax):
     for i in range(1, imax + 2):
         for j in range(1, jmax + 1):

@@ -79,6 +79,7 @@ def main():
     v_global = comm.gather(solver.v, root=0)
     if rank == 0:
         print(f"Total Wall Time: {tElapsed_global:.5f} seconds")
+        solver.save_u_v()
         
     
 
