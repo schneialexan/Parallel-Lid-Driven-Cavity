@@ -34,11 +34,11 @@ if __name__ == "__main__":
     size = comm.Get_size()
 
     # Simulation Params
-    Nx = Ny = 10
+    Nx = Ny = 100
     x_length = y_length = 1.0
     dx = x_length / (Nx - 1)
     dy = y_length / (Ny - 1)
-    partitionSize = (2, 2) # (Px, Py) --> Px * Py = Number of cores    
+    partitionSize = (int(size**0.5), int(size**0.5)) # (Px, Py) --> Px * Py = Number of cores    
     
     # Create Cartesian Grid
     cartGrid =  comm.Create_cart(dims=partitionSize, periods=[False, False])
