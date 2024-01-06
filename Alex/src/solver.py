@@ -1,6 +1,5 @@
 import numpy as np
 from mpi4py import MPI
-import os
 from numba import jit
 
 class Alex_Louis_Solver:
@@ -26,6 +25,9 @@ class Alex_Louis_Solver:
         self.omg = omg
         self.itermax = itermax
         self.alpha = alpha
+        
+        # coords vs. subPos
+        print(f'Rank {self.rank}\t | Coords: {self.coords}\t | Subgrid Position: ({self.subPos[0]:.4f},{self.subPos[1]:.4f}) \t | Rank Shift: {self.rankShift}')
 
         self.poissonSolver = None
         
@@ -64,23 +66,7 @@ class Alex_Louis_Solver:
             compute_v(self.v, self.G, self.p, self.dy, self.dt, self.Nx, self.Ny)
             self.po = self.p
             t += self.dt
-            #self.dt = select_dt_according_to_stability_condition(Re, dx, dy, tau, u, v, imax, jmax)
-    
-    def save_u_v(self, path="data/"):
-        def save_matrix(filename, matrix):
-            with open(filename, 'w') as file:
-                for i in range(matrix.shape[0]):
-                    for j in range(matrix.shape[1]):
-                        file.write(f"{matrix[i, j]:.5f} ")
-                    file.write("\n")
-            print(f"Matrix saved to {filename}")
-        
-        # check if path exists
-        if not os.path.exists(path):
-            os.makedirs(path)
-        
-        save_matrix(path + "u.dat", self.u)
-        save_matrix(path + "v.dat", self.v)
+            self.dt = select_dt_according_to_stability_condition(self.Re, self.dx, self.dy, self.tau, self.u, self.v, self.Nx, self.Ny)
             
 
 def find_max_absolute_u(u, imax, jmax):

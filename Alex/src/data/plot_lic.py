@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
-path = 'np_1/'
+path = os.path.join(os.getcwd(), r'Parallel-Lid-Driven-Cavity\Alex\src\data\0-1\\')
 data_u = np.loadtxt(path+'u.dat')
 data_v = np.loadtxt(path+'v.dat')
 data_interpolated_u = np.zeros((data_u.shape[0], data_v.shape[1]))
@@ -32,5 +33,5 @@ X, Y = np.meshgrid(x, y)
 plt.quiver(X[::st,::st] , Y[::st,::st], data_interpolated_u[::st,::st], data_interpolated_v[::st,::st], scale=scale, color='white')
 
 plt.gca().invert_yaxis()
-plt.savefig('plot_velocity.png')
+#plt.savefig('plot_velocity.png')
 plt.show()
