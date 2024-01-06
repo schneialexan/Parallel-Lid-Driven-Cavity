@@ -82,6 +82,4 @@ if __name__ == "__main__":
         print(f'Unique values in u: {np.unique(u)}')
         print(f'Unique values in v: {np.unique(v)}')
         print(f'Unique values in p: {np.unique(p)}')
-        print(f'{u=}')
-        print(f'{v=}')
-        print(f'{p=}')
+        print(f'{p.shape=} | {p_local.shape=}')

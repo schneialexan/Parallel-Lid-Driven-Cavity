@@ -67,9 +67,13 @@ if __name__ == "__main__":
     if rank == 0:
         for i in range(size):
             if i != rank:
-                comm.send(u, dest=i, tag=0)
-                comm.send(v, dest=i, tag=1)
-                comm.send(p, dest=i, tag=2)
+                coords = cartGrid.Get_coords(i)
+                comm.send(u[coords[0]*subgrid_size[0]:(coords[0]+1)*subgrid_size[0], coords[1]*subgrid_size[1]:(coords[1]+1)*subgrid_size[1]], dest=i, tag=0)
+                comm.send(v[coords[0]*subgrid_size[0]:(coords[0]+1)*subgrid_size[0], coords[1]*subgrid_size[1]:(coords[1]+1)*subgrid_size[1]], dest=i, tag=1)
+                comm.send(p[coords[0]*subgrid_size[0]:(coords[0]+1)*subgrid_size[0], coords[1]*subgrid_size[1]:(coords[1]+1)*subgrid_size[1]], dest=i, tag=2)
+        u_local = u[0:subgrid_size[0], 0:subgrid_size[1]]
+        v_local = v[0:subgrid_size[0], 0:subgrid_size[1]]
+        p_local = p[0:subgrid_size[0], 0:subgrid_size[1]]
     else:
         u_local = comm.recv(source=0, tag=0)
         v_local = comm.recv(source=0, tag=1)
