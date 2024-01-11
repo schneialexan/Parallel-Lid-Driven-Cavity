@@ -13,7 +13,6 @@ def LDCprogram_options():
     parser.add_argument('--T', type=float, default=5.0, help="Final time.")
     parser.add_argument('--tau', type=float, default=0.5, help="Safety factor for time step size.")
     parser.add_argument('--eps', type=float, default=1e-3, help="Convergence criterion for the iterative solver.")
-    parser.add_argument('--omg', type=float, default=1.7, help="Relaxation parameter for the iterative solver.")
     parser.add_argument('--itermax', type=int, default=100, help="Maximum number of iterations for the iterative solver.")
     parser.add_argument('--alpha', type=float, default=0.5, help="Upwind differencing factor.")
     parser.add_argument('--Re', type=float, default=100.0, help="Reynolds number.")

@@ -3,13 +3,11 @@ import numpy as np
 from mpi4py import MPI
 import time
 from typing import Tuple
-import sys
+import os
 
-from sympy import true
-
-N_GRIDPOINTS = 64                      # Anzahl Gitterpunkte
+N_GRIDPOINTS = 2**7                      # Anzahl Gitterpunkte
 DOMAIN_SIZE = 1.                        # Länge des Gebietes
-TIME_STEP_LENGTH = 0.001                # Länge des Zeitschrittes, aufgrund der CFL-Bedingung und der Stabilität
+TIME_STEP_LENGTH = 0.001                # Länge des Zeitschrittes, aufgrund der CFL-Bedingung und der Stabilität || 15k s
 DENSITY = 1.                            # Dichte
 KINEMATIC_VISCOSITY = 0.01              # kinematische Viskosität
 HORIZONTAL_VELOCITY_TOP = 1.            # Geschwindigkeit oben (Deckel bzw. Wand)
@@ -17,6 +15,7 @@ HORIZONTAL_VELOCITY_TOP = 1.            # Geschwindigkeit oben (Deckel bzw. Wand
 N_PRESSURE_ITERATIONS = 100            # Anzahl Iterationen für den Druck
 STABILITY_SAFETY_FACTOR = 0.5           # Sicherheitsfaktor für die Stabilität
 ELEMENT_LENGTH = DOMAIN_SIZE / (N_GRIDPOINTS - 1)   # Länge eines Elements
+REYNOLDS_NUMBER = HORIZONTAL_VELOCITY_TOP * DOMAIN_SIZE / KINEMATIC_VISCOSITY
 
 def central_difference_x(f):
     diff = np.zeros_like(f)
@@ -47,7 +46,7 @@ def enforce_boundary_conditions(u, v):
     v[:, -1] = 0.0  # right boundary
     return u, v
 
-def plot_veloctiy_and_pressure(X, Y, p_next, u_next, v_next):
+def plot_veloctiy_and_pressure(X, Y, p_next, u_next, v_next, path):
     plt.figure(figsize=(8, 6))
     scale = 2
     plt.contourf(X[::scale, ::scale], Y[::scale, ::scale], p_next[::scale, ::scale])
@@ -55,15 +54,14 @@ def plot_veloctiy_and_pressure(X, Y, p_next, u_next, v_next):
     plt.colorbar()
 
     # Set title and axis labels
-    plt.title('Velocity and Pressure Contours')
+    plt.title(f'Velocity and Pressure Contours for Re={REYNOLDS_NUMBER:.2f}')
     plt.xlabel('X-axis')
     plt.ylabel('Y-axis')
     plt.xlim((0, 1))
     plt.ylim((0, 1))
 
     # Show the plot
-    path = f'data'
-    plt.savefig(f'{path}/threshold_{threshold}.png')
+    plt.savefig(f'{path}/Velocity_and_Pressure_Contours.png')
     plt.show()
 
 def split_grid(grid_size: Tuple[int, int], partition_size: Tuple[int, int], coords: Tuple[int, int],
@@ -115,8 +113,9 @@ start = time.time()
 
 error = 1.
 threshold = 1e-5
+max_iter = 250000
     
-while error > threshold and n_iter < 50000:
+while error > threshold and n_iter < max_iter:
     if n_iter % 1000 == 0:
         print(f'Rank {rank}\t | Iteration: {n_iter:3d} with error: {error}')
     # 0. Initialisierung
@@ -132,7 +131,7 @@ while error > threshold and n_iter < 50000:
     v_tentative = (v + TIME_STEP_LENGTH*(KINEMATIC_VISCOSITY*laplace_v - (u*dv_dx + v*dv_dy)))
     # 1. Randbedingungen erzwingen
     u_tentative, v_tentative = enforce_boundary_conditions(u_tentative, v_tentative)
-    
+    # 1. Ableitungen berechnen
     du_tentative_dx = central_difference_x(u_tentative)
     dv_tentative_dy = central_difference_y(v_tentative)
     
@@ -142,6 +141,7 @@ while error > threshold and n_iter < 50000:
 
     p_local = np.zeros((subgrid_size[0], subgrid_size[1]))
     rhs_subgrid = np.zeros((subgrid_size[0], subgrid_size[1]))
+    
     if rank == 0:
         for i in range(size):
             if i != rank:
@@ -154,7 +154,7 @@ while error > threshold and n_iter < 50000:
         p_local = comm.recv(source=0, tag=0)
         rhs_subgrid = comm.recv(source=0, tag=1)
     
-    # 2. Druck Laplace lösen
+    # 2. Druck berechnen (mit Jacobi-Iteration)
     for _ in range(N_PRESSURE_ITERATIONS):
         p_next = np.zeros_like(p_local)
         p_next[1:-1, 1:-1] = 1/4 * (+p_local[1:-1, 0:-2]+p_local[0:-2, 1:-1]+p_local[1:-1, 2:]+p_local[2:, 1:-1]-ELEMENT_LENGTH**2*rhs_subgrid[1:-1, 1:-1])
@@ -164,7 +164,7 @@ while error > threshold and n_iter < 50000:
         if rankShiftX[1] == MPI.PROC_NULL:
             p_next[:, -1] = p_next[:, -2]   # right boundary (Neumann)
         if rankShiftY[0] == MPI.PROC_NULL:
-            p_next[-1, :] = 0.0               # top boundary (Neumann)
+            p_next[-1, :] = 1.0             # top boundary (Dirichlet)
         if rankShiftY[1] == MPI.PROC_NULL:
             p_next[0,  :] = p_next[1,  :]   # bottom boundary (Neumann)
         p_local = p_next
@@ -216,4 +216,9 @@ if rank == 0:
     x = np.linspace(0.0, DOMAIN_SIZE, N_GRIDPOINTS)
     y = np.linspace(0.0, DOMAIN_SIZE, N_GRIDPOINTS)
     X, Y = np.meshgrid(x, y)
-    plot_veloctiy_and_pressure(X, Y, p_collect, u_next, v_next)
+    path = f'data/{N_GRIDPOINTS}x{N_GRIDPOINTS}_{size}_{threshold}'
+    if os.path.exists(path) == False:
+        os.mkdir(path)
+    plot_veloctiy_and_pressure(X, Y, p_collect, u_next, v_next, path)
+    np.save(f'{path}/u.npy', u_next)
+    np.save(f'{path}/v.npy', v_next)

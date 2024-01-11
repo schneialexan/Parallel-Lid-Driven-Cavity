@@ -4,16 +4,28 @@ from mpi4py import MPI
 import time
 from typing import Tuple
 
-N_GRIDPOINTS = 100                      # Anzahl Gitterpunkte
+N_GRIDPOINTS = 256                      # Anzahl Gitterpunkte
 DOMAIN_SIZE = 1.                        # Länge des Gebietes
-TIME_STEP_LENGTH = 0.001                # Länge des Zeitschrittes, aufgrund der CFL-Bedingung und der Stabilität
+TIME_STEP_LENGTH = 0.00035               # Länge des Zeitschrittes, aufgrund der CFL-Bedingung und der Stabilität
 DENSITY = 1.                            # Dichte
 KINEMATIC_VISCOSITY = 0.01              # kinematische Viskosität
 HORIZONTAL_VELOCITY_TOP = 1.            # Geschwindigkeit oben (Deckel bzw. Wand)
 
 N_PRESSURE_ITERATIONS = 100            # Anzahl Iterationen für den Druck
-STABILITY_SAFETY_FACTOR = 0.5           # Sicherheitsfaktor für die Stabilität
+STABILITY_SAFETY_FACTOR = 0.5           # Sicherheitsfaktor für die Stabilität (=tau für CFL-Bedingung)
 ELEMENT_LENGTH = DOMAIN_SIZE / (N_GRIDPOINTS - 1)   # Länge eines Elements
+
+def find_max_absolute_u(u, imax, jmax):
+    return np.max(np.abs(u[1:imax + 1, 1:jmax + 2]))
+
+def find_max_absolute_v(v, imax, jmax):
+    return np.max(np.abs(v[1:imax + 2, 1:jmax + 1]))
+
+def select_dt_according_to_stability_condition(Re, dx, dy, tau, u, v, imax, jmax):
+    left = (Re / 2) * ((1 / dx ** 2) + (1 / dy ** 2)) ** -1
+    middle = dx / find_max_absolute_u(u, imax, jmax)
+    right = dy / find_max_absolute_v(v, imax, jmax)
+    return tau * min(left, middle, right)
 
 def central_difference_x(f):
     diff = np.zeros_like(f)
@@ -108,9 +120,10 @@ error = 1.
 threshold = 1e-5
 n_iter = 0
 start = time.time()
-while error > threshold:
+while error > threshold and n_iter < 10000:
+    #TIME_STEP_LENGTH = select_dt_according_to_stability_condition(KINEMATIC_VISCOSITY, ELEMENT_LENGTH, ELEMENT_LENGTH, STABILITY_SAFETY_FACTOR, u, v, N_GRIDPOINTS, N_GRIDPOINTS)
     if n_iter % 1000 == 0:
-        print(f'Rank {rank}\t | Iteration: {n_iter:3d} with error: {error}')
+        print(f'Rank {rank}\t | Iteration: {n_iter} with error: {error:.4f} | dt: {TIME_STEP_LENGTH}')
     # 0. Initialisierung
     du_dx = central_difference_x(u)
     du_dy = central_difference_y(u)

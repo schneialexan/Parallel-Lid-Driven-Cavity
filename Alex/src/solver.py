@@ -3,12 +3,13 @@ from mpi4py import MPI
 from numba import jit
 
 class Alex_Louis_Solver:
-    def __init__(self, MPIcomm, rank, rankShift, coords, gridSize, dt, t_end, tau, eps, omg, itermax, alpha, dx, dy, subPos, Re):
+    def __init__(self, MPIcomm, rank, rankShift, coords, gridSize, dt, t_end, tau, eps, itermax, alpha, dx, dy, subPos, Re):
         self.MPIcomm = MPIcomm
         self.rank = rank
 
         self.coords = np.array(coords)
         self.rankShift = np.array(rankShift)
+        self.iterations = 0
 
         self.Nx, self.Ny = gridSize
         self.dx, self.dy = dx, dy
@@ -22,7 +23,6 @@ class Alex_Louis_Solver:
         
         self.tau = tau
         self.eps = eps
-        self.omg = omg
         self.itermax = itermax
         self.alpha = alpha
         
@@ -47,28 +47,37 @@ class Alex_Louis_Solver:
         self.F = np.zeros((self.Nx + 2, self.Ny + 3))
         self.v = np.zeros((self.Nx + 3, self.Ny + 2))
         self.G = np.zeros((self.Nx + 3, self.Ny + 2))
+        
+    def split_grid(self):
+        pass
 
+    def fuse_grid(self):
+        pass
     def solve(self):
         t = 0.0
         res = 9999
         while t < self.tEnd:
-            n = 0
             set_boundary_conditions(self.u, self.v, self.Ny, self.Nx)
             compute_f(self.Re, self.F, self.u, self.v, self.dx, self.dy, self.dt, self.Nx, self.Ny, self.alpha)
             compute_g(self.Re, self.G, self.u, self.v, self.dx, self.dy, self.dt, self.Nx, self.Ny, self.alpha)
             compute_rhs(self.RHS, self.F, self.G, self.dx, self.dy, self.dt, self.Nx, self.Ny)
+            n = 0
+            # split for each process
+            self.split_grid()
             while (res > self.eps or res == 0) and n < self.itermax:
                 set_boundary_conditions_p(self.p, self.Ny, self.Nx)
                 update_step_lgls(self.RHS, self.p, self.dx, self.dy, self.Nx, self.Ny)
                 res = compute_residual(self.p, self.po)
                 n += 1
+            # fuse for each process
+            self.fuse_grid()
             compute_u(self.u, self.F, self.p, self.dx, self.dt, self.Nx, self.Ny)
             compute_v(self.v, self.G, self.p, self.dy, self.dt, self.Nx, self.Ny)
             self.po = self.p
             t += self.dt
+            self.iterations += 1
             self.dt = select_dt_according_to_stability_condition(self.Re, self.dx, self.dy, self.tau, self.u, self.v, self.Nx, self.Ny)
             
-
 def find_max_absolute_u(u, imax, jmax):
     return np.max(np.abs(u[1:imax + 1, 1:jmax + 2]))
 
