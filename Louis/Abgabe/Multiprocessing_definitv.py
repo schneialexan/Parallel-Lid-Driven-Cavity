@@ -12,7 +12,7 @@ num_cpus = multiprocessing.cpu_count()
 print(f"Anzahl der verfügbaren CPU-Kerne: {num_cpus}")
 
 
-# Deine Konstanten
+#  Konstanten
 N_GRIDPOINTS = 64
 DOMAIN_SIZE = 1.0
 TIME_STEP_LENGTH = 0.001
@@ -163,26 +163,26 @@ if __name__ == '__main__':
     print(f'Anzahl der Prozesse: {num_processes}'
           f' Anzahl Gitterpunkte: {N_GRIDPOINTS}')
 
-    # Schritte 8 und 9 werden durch die Kontextmanager-Notation mit concurrent.futures.ThreadPoolExecutor ersetzt
+   
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_processes) as executor:
         while error > threshold:
             if n_iter % 1000 == 0:
                 print(f'Iteration: {n_iter:3d} with error: {error}')
 
-            # Prozesse vorbereiten
+            
             process_args = [(n_iter, u, v, p, threshold, TIME_STEP_LENGTH, KINEMATIC_VISCOSITY,
                              N_PRESSURE_ITERATIONS, ELEMENT_LENGTH, DENSITY) for _ in range(num_processes)]
 
             # Prozesse parallel ausführen
             results = executor.map(process_iteration_parallel, process_args)
 
-            # Ergebnisse sammeln
+            # Ergebnisse 
             for result in results:
                 u, v, p, error = result
 
             n_iter += num_processes
 
-    # Schritt 10 bleibt unverändert
+
     num_cpus = multiprocessing.cpu_count()
     print(f"Anzahl der verfügbaren CPU-Kerne: {num_cpus}")
     print(f'benutzte CPU-Kerne: {num_processes}')
