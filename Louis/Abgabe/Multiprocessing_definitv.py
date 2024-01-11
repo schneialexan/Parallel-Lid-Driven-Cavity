@@ -3,7 +3,11 @@ import numpy as np
 import time
 from typing import Tuple
 import multiprocessing
+import concurrent.futures
+
+
 num_cpus = multiprocessing.cpu_count()
+
 
 print(f"Anzahl der verfügbaren CPU-Kerne: {num_cpus}")
 
@@ -67,9 +71,13 @@ def plot_veloctiy_and_pressure(X, Y, p_next, u_next, v_next):
     # Show the plot
     plt.show()
 
-# Funktion für eine Iteration der Schleife
-def process_iteration(iteration_number, u, v, p, threshold, TIME_STEP_LENGTH, KINEMATIC_VISCOSITY,
-                      N_PRESSURE_ITERATIONS, ELEMENT_LENGTH, DENSITY):
+
+
+
+
+def process_iteration_parallel(args):
+    iteration_number, u, v, p, threshold, TIME_STEP_LENGTH, KINEMATIC_VISCOSITY, N_PRESSURE_ITERATIONS, ELEMENT_LENGTH, DENSITY = args
+
     # Initialisierung
     du_dx = central_difference_x(u)
     du_dy = central_difference_y(u)
@@ -134,13 +142,12 @@ def process_iteration(iteration_number, u, v, p, threshold, TIME_STEP_LENGTH, KI
     p_error = np.max(np.abs((p - p_old) / TIME_STEP_LENGTH))
     
     error = max(u_error, v_error, p_error)
-    
+
     return u, v, p, error
 
 
 
 
-# Hauptprogramm
 if __name__ == '__main__':
     # Initialisierung
     u = np.zeros((N_GRIDPOINTS, N_GRIDPOINTS))
@@ -151,33 +158,31 @@ if __name__ == '__main__':
     start = time.time()
 
     error = 1.0
-    threshold = 1e-5 # noch anpassen 
-    num_processes = 1 # noch anpassen
+    threshold = 1e-1  # noch anpassen
+    num_processes = 4  # noch anpassen
+    print(f'Anzahl der Prozesse: {num_processes}'
+          f' Anzahl Gitterpunkte: {N_GRIDPOINTS}')
 
-    # Pool erstellen
+    # Schritte 8 und 9 werden durch die Kontextmanager-Notation mit concurrent.futures.ThreadPoolExecutor ersetzt
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_processes) as executor:
+        while error > threshold:
+            if n_iter % 1000 == 0:
+                print(f'Iteration: {n_iter:3d} with error: {error}')
 
-    
-    pool = multiprocessing.Pool(processes=num_processes)
+            # Prozesse vorbereiten
+            process_args = [(n_iter, u, v, p, threshold, TIME_STEP_LENGTH, KINEMATIC_VISCOSITY,
+                             N_PRESSURE_ITERATIONS, ELEMENT_LENGTH, DENSITY) for _ in range(num_processes)]
 
-    while error > threshold:
-        if n_iter % 1000 == 0:
-            print(f'Iteration: {n_iter:3d} with error: {error}')
+            # Prozesse parallel ausführen
+            results = executor.map(process_iteration_parallel, process_args)
 
-        # Prozesse vorbereiten
-        process_args = [(n_iter, u, v, p, threshold, TIME_STEP_LENGTH, KINEMATIC_VISCOSITY,
-                         N_PRESSURE_ITERATIONS, ELEMENT_LENGTH, DENSITY) for _ in range(num_processes)]
+            # Ergebnisse sammeln
+            for result in results:
+                u, v, p, error = result
 
-        # Prozesse ausführen
-        results = pool.starmap(process_iteration, process_args)
+            n_iter += num_processes
 
-        # Ergebnisse sammeln
-        for result in results:
-            u, v, p, error = result
-
-        n_iter += num_processes
-
-    pool.close()
-    pool.join()
+    # Schritt 10 bleibt unverändert
     num_cpus = multiprocessing.cpu_count()
     print(f"Anzahl der verfügbaren CPU-Kerne: {num_cpus}")
     print(f'benutzte CPU-Kerne: {num_processes}')
