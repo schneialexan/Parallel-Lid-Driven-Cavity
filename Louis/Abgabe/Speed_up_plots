@@ -1,0 +1,57 @@
+import pandas as pd
+from io import StringIO
+import matplotlib.pyplot as plt
+
+# MPI
+data_str_mpi = """1,12.961003231000177,64x64
+4,6.786591617999875,64x64
+16,6.73950984000021,64x64
+1,221.78383563499983,128x128
+4,94.90745238800014,128x128
+16,65.49899360199993,128x128
+1,1641.5110392510003,256x256
+4,604.9073670390003,256x256
+16,456.894065406,256x256
+"""
+
+df_MPI = pd.read_csv(StringIO(data_str_mpi), sep=',', header=None, names=['Prozessoren', 'Zeit', 'Anzahl_Gitterpunkte'])
+df_MPI['Speedup'] = df_MPI.groupby('Anzahl_Gitterpunkte')['Zeit'].transform(lambda x: x.min() / x)
+
+# Multithreading
+data_str_mt = """1,6,64x64
+4,12,64x64
+16,39,64x64
+1,23,128x128
+4,51,128x128
+16,168,128x128
+1,250,256x256
+4,542,256x256
+16,1761,256x256
+"""
+
+df_Mt = pd.read_csv(StringIO(data_str_mt), sep=',', header=None, names=['Prozessoren', 'Zeit', 'Anzahl_Gitterpunkte'])
+df_Mt['Speedup'] = df_Mt.groupby('Anzahl_Gitterpunkte')['Zeit'].transform(lambda x: x.min() / x)
+
+# Plot MPI
+plt.figure(figsize=(10, 6))
+for gridpoints, group in df_MPI.groupby('Anzahl_Gitterpunkte'):
+    plt.plot(group['Prozessoren'], group['Speedup'], marker='o', label=f'{gridpoints}')
+
+plt.title('Speedup vs. Number of Processors for Different Gridpoints (MPI)')
+plt.xlabel('Number of Processors')
+plt.ylabel('Speedup')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Plot Multithreading
+plt.figure(figsize=(10, 6))
+for gridpoints, group in df_Mt.groupby('Anzahl_Gitterpunkte'):
+    plt.plot(group['Prozessoren'], group['Speedup'], marker='o', label=f'{gridpoints}')
+
+plt.title('Speedup vs. Number of Processors for Different Gridpoints (Multithreading)')
+plt.xlabel('Number of Processors')
+plt.ylabel('Speedup')
+plt.legend()
+plt.grid(True)
+plt.show()
